@@ -22,13 +22,6 @@ class ConfirmPasswordController extends Controller
     use ConfirmsPasswords;
 
     /**
-     * Where to redirect users when the intended url fails.
-     *
-     * @var string
-     */
-    protected $redirectTo = RouteServiceProvider::HOME;
-
-    /**
      * Create a new controller instance.
      *
      * @return void
@@ -36,5 +29,19 @@ class ConfirmPasswordController extends Controller
     public function __construct()
     {
         $this->middleware('auth');
+    }
+
+    /**
+     * Where to redirect users when the intended url fails.
+     *
+     * @var string
+     */
+    protected function redirectTo()
+    {
+        if (auth()->user()->is_admin) {
+            return RouteServiceProvider::ADMIN;
+        } else {
+            return RouteServiceProvider::HOME;
+        }
     }
 }
