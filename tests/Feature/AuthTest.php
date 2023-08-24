@@ -30,19 +30,19 @@ class AuthTest extends TestCase
         $response->assertRedirect('register');
     }
 
-    // public function test_unferified_user_redirects_to_verify_page() : void
-    // {
-    //     $user = User::factory()->create([
-    //         'name' => 'John Doe',
-    //         'email' => 'johnd@example.com',
-    //         'email_verified_at' => null
-    //     ]);
+    public function test_unferified_user_redirects_to_verify_page() : void
+    {
+        $user = User::factory()->create([
+            'name' => 'John Doe',
+            'email' => 'johnd@example.com',
+            'email_verified_at' => null
+        ]);
 
-    //     $response = $this->actingAs($user)->get('/user/home');
+        $response = $this->actingAs($user)->get('/user/home');
 
-    //     $response->assertStatus(302);
-    //     $response->assertRedirect('/email/verify');
-    // }
+        $response->assertStatus(302);
+        $response->assertRedirect('/email/verify');
+    }
 
     public function test_user_login_successfull_redirects_to_url_user_home() : void
     {
