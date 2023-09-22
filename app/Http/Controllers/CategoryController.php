@@ -6,90 +6,98 @@ use App\Models\Asset;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Yajra\DataTables\Facades\DataTables;
+
 
 class CategoryController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
-    {
-        $categories = Category::select('id', 'name', 'description')->paginate(10);
 
-        return view('category.index', compact('categories'));
+    public function index(Request $request)
+    {
+        $categories = DB::table('categories')
+                        ->select('categories.id', 'categories.name', 'categories.description', DB::raw('count(assets.category_id) as asset_qty'))
+                        ->join('assets', 'categories.id', 'assets.category_id')
+                        ->groupBy('categories.id');
+
+        if ($request->ajax()) {
+            $data = $categories;
+            return DataTables::of($data)
+                    ->addIndexColumn()
+                    ->make(true);
+        }
+
+        return view('pages.assetManagement.category.index', compact('categories'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        return view('category.create');
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        $request->validate([
-            'categoryName' => 'required',
-        ]);
+        $response = array();
+        $categoryId = $request->id;
 
-        Category::create([
-            'name' => $request->input('categoryName'),
-            'description' => $request->input('categoryDescription')
-        ]);
+        DB::beginTransaction();
+        try {
 
-        return redirect()->route('admin.categories.index');
+            $request->validate([
+                'name' => 'required'
+            ]);
+
+            Category::updateOrCreate(
+                ['id' => $categoryId],
+                [
+                    'name' => $request->categoryName,
+                    'description' => $request->categoryDescription
+                ]
+            );
+            DB::commit();
+            $response = array('status' => 'success');
+        } catch (\Exception $e) {
+            DB::rollback();
+            $response = array('status' => 'failed', 'errors' => $e->getMessage());
+        }
+
+        return response()->json($response, 202);
+
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Category $category)
+    public function deleteCategoryConfirmation(Request $request, $id)
     {
-        //
+        $categoryId = $request->id;
+        $assets = DB::table('assets')->where('category_id', $categoryId)->get();
+
+        if ($assets->count() > 0) {
+            foreach ($assets as $asset) {
+                echo "<p> <b>$asset->name</b> with <b> $asset->total_unit Units </b> </p>";
+            }
+        } else {
+            echo "<p>Asset Empty</p>";
+        }
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Category $category)
+
+    public function deleteCategory($id)
     {
-        return view('category.edit', compact('category'));
-    }
+        $response = array();
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Category $category)
-    {
-        $request->validate([
-            'categoryName' => 'required',
-        ]);
+        try {
+            DB::beginTransaction();
 
-        $category->update([
-            'name' => $request->input('categoryName'),
-            'description' => $request->input('categoryDescription'),
-        ]);
+                DB::table('units')
+                ->join('assets', 'units.asset_id','=', 'assets.id')
+                ->where('assets.category_id', $id)->delete();
 
-        return redirect()->route('admin.categories.index');
-    }
+                DB::table('assets')->where('category_id', $id)->delete();
+                DB::table('categories')->where('id', $id)->delete();
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Category $category)
-    {
-        DB::transaction(function () use ($category) {
-            $asset = Asset::where('category_id', $category->id)->first();
+                $response = array('status' => 'success');
 
-            DB::table('units')->where('asset_id', $asset->id)->delete();
-            DB::table('assets')->where('category_id', $category->id);
-            $category->delete();
-        });
+            DB::commit();
 
-        return redirect()->route('admin.categories.index');
+        } catch (\Exception $e) {
+            DB::rollback();
+            $response = array('status' => 'failed', 'errors' => $e->getMessage());
+        }
+
+        return response()->json($response, 202);
+
     }
 }
